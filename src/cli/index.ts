@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
+import fg from 'fast-glob';
 import {
   verifyNpmPackage,
   verifyPyPIPackage,
@@ -10,6 +11,8 @@ import {
 } from '../checkers/packages.js';
 import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
+import { auditManifests } from '../checkers/manifests.js';
+import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { runServer } from '../mcp/server.js';
 
 const program = new Command();
@@ -17,9 +20,9 @@ const program = new Command();
 program
   .name('agentguard')
   .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.1.0');
+  .version('1.2.0');
 
-// Verify package CLI
+// Verify single package CLI
 program
   .command('check-package <name>')
   .description('Verify if a package is genuine or an AI hallucination / recent typosquat')
@@ -54,6 +57,67 @@ program
       if (result.version) console.log(chalk.gray(`  Version: ${result.version}`));
       if (result.ageDays !== undefined) console.log(chalk.gray(`  Age: ${result.ageDays} days`));
       if (result.weeklyDownloads !== undefined) console.log(chalk.gray(`  Downloads: ${result.weeklyDownloads}`));
+    }
+  });
+
+// Full Workspace Manifest Audit
+program
+  .command('audit-manifests [directory]')
+  .description('Scan all package.json, requirements.txt, and Cargo.toml for hallucinated dependencies')
+  .option('--format <format>', 'Output format: human or json', 'human')
+  .action(async (directory = process.cwd(), options) => {
+    if (options.format === 'human') {
+      console.log(chalk.blue(`\n📦 Auditing all workspace manifests in ${directory}...`));
+    }
+
+    const report = await auditManifests(directory);
+
+    if (options.format === 'json') {
+      console.log(JSON.stringify(report, null, 2));
+      if (!report.passed) process.exitCode = 1;
+      return;
+    }
+
+    console.log(`\nScanned files: ${report.scannedFiles.join(', ')}`);
+    console.log(`Total dependencies verified: ${report.totalDependencies}`);
+
+    if (report.hallucinatedCount > 0) {
+      console.log(chalk.red.bold(`\n🚨 DETECTED ${report.hallucinatedCount} HALLUCINATED DEPENDENCIES:`));
+      report.dependencies
+        .filter((d) => d.result.isHallucinated)
+        .forEach((d) => {
+          console.log(chalk.red(`  • ${d.name} in ${d.file}`));
+        });
+      process.exitCode = 1;
+    } else {
+      console.log(chalk.green.bold('\n✨ All manifest dependencies are genuine and verified!'));
+    }
+  });
+
+// Scan for leaked secrets
+program
+  .command('scan-secrets [files...]')
+  .description('Scan modified code or directory for accidentally hardcoded API keys and tokens')
+  .action(async (files) => {
+    let targetFiles = files;
+    if (!files || files.length === 0) {
+      targetFiles = await fg(['src/**/*.{ts,js,py}', '**/*.{ts,js,py}'], {
+        ignore: ['**/node_modules/**', '**/dist/**']
+      });
+    }
+
+    console.log(chalk.blue(`\n🔑 Scanning ${targetFiles.length} files for credentials/secrets...`));
+    const report = await detectHardcodedSecrets(targetFiles);
+
+    if (report.totalLeaks === 0) {
+      console.log(chalk.green.bold('✨ No leaked API keys or secret credentials detected.'));
+    } else {
+      console.log(chalk.red.bold(`\n🚨 CRITICAL: Found ${report.totalLeaks} hardcoded credentials!`));
+      report.detections.forEach((d) => {
+        console.log(chalk.red(`  • [${d.patternType}] in ${d.filePath}:${d.line}`));
+        console.log(chalk.gray(`    ${d.snippet}`));
+      });
+      process.exitCode = 1;
     }
   });
 

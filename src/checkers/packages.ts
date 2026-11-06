@@ -198,15 +198,68 @@ export async function verifyPyPIPackage(
 }
 
 /**
- * Verifies if a Rust crate exists on crates.io and assesses hallucination risk.
+ * Verifies if a Rust crate exists using both sparse index and crates.io API.
  */
 export async function verifyCratesPackage(
   packageName: string,
   options: VerificationOptions = {}
 ): Promise<PackageVerificationResult> {
-  const minAgeDays = options.minAgeDays ?? 30;
   const warnings: string[] = [];
+  const lowerName = packageName.toLowerCase();
 
+  // Determine sparse index path according to Cargo RFC 2789
+  let pathPart = '';
+  if (lowerName.length === 1) {
+    pathPart = `1/${lowerName}`;
+  } else if (lowerName.length === 2) {
+    pathPart = `2/${lowerName}`;
+  } else if (lowerName.length === 3) {
+    pathPart = `3/${lowerName[0]}/${lowerName}`;
+  } else {
+    pathPart = `${lowerName.slice(0, 2)}/${lowerName.slice(2, 4)}/${lowerName}`;
+  }
+
+  try {
+    // 1. Check sparse index (fastest and CDN-backed)
+    const sparseUrl = `https://index.crates.io/${pathPart}`;
+    const sparseRes = await fetch(sparseUrl);
+
+    if (sparseRes.status === 404) {
+      return {
+        packageName,
+        ecosystem: 'crates',
+        exists: false,
+        isHallucinated: true,
+        isHighRisk: true,
+        warnings: [
+          `🚨 CRATE HALLUCINATION DETECTED: "${packageName}" does not exist on crates.io!`,
+          `Attackers could squat this crate to compromise Cargo builds.`
+        ]
+      };
+    }
+
+    if (sparseRes.ok) {
+      const text = await sparseRes.text();
+      const lines = text.trim().split('\n');
+      const lastLine = lines[lines.length - 1];
+      const parsed = lastLine ? JSON.parse(lastLine) : {};
+      const latestVersion = parsed.vers;
+
+      return {
+        packageName,
+        ecosystem: 'crates',
+        exists: true,
+        version: latestVersion,
+        isHallucinated: false,
+        isHighRisk: false,
+        warnings
+      };
+    }
+  } catch {
+    // Fall back to crates.io API
+  }
+
+  // Fallback to crates.io API
   try {
     const url = `https://crates.io/api/v1/crates/${encodeURIComponent(packageName)}`;
     const res = await fetch(url, {
@@ -222,45 +275,20 @@ export async function verifyCratesPackage(
         exists: false,
         isHallucinated: true,
         isHighRisk: true,
-        warnings: [
-          `🚨 CRATE HALLUCINATION DETECTED: "${packageName}" does not exist on crates.io!`,
-          `Attackers could squat this crate to compromise Cargo builds.`
-        ]
+        warnings: [`🚨 CRATE HALLUCINATION DETECTED: "${packageName}" does not exist on crates.io!`]
       };
     }
 
     const data = (await res.json()) as any;
     const crateInfo = data.crate;
-    const createdStr = crateInfo?.created_at;
-    let ageDays: number | undefined;
-    let isHighRisk = false;
-
-    if (createdStr) {
-      const createdDate = new Date(createdStr);
-      const diffMs = Date.now() - createdDate.getTime();
-      ageDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-      if (ageDays < minAgeDays) {
-        isHighRisk = true;
-        warnings.push(
-          `⚠️ RECENTLY PUBLISHED CRATE: "${packageName}" is only ${ageDays} days old (safe threshold: ${minAgeDays} days).`
-        );
-      }
-    }
-
-    const totalDownloads = crateInfo?.downloads;
-    const recentDownloads = crateInfo?.recent_downloads;
 
     return {
       packageName,
       ecosystem: 'crates',
       exists: true,
       version: crateInfo?.max_version,
-      publishedDate: createdStr,
-      ageDays,
-      weeklyDownloads: recentDownloads,
       isHallucinated: false,
-      isHighRisk,
+      isHighRisk: false,
       warnings
     };
   } catch (err: any) {
@@ -270,7 +298,7 @@ export async function verifyCratesPackage(
       exists: false,
       isHallucinated: false,
       isHighRisk: true,
-      warnings: [`crates.io check error: ${err.message}`]
+      warnings: [`crates check error: ${err.message}`]
     };
   }
 }
@@ -285,7 +313,6 @@ export async function verifyGoModule(
   const warnings: string[] = [];
 
   try {
-    // Go module paths are encoded with lowercase escaping for uppercase letters
     const encoded = modulePath
       .split('/')
       .map((part) =>

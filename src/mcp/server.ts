@@ -13,12 +13,14 @@ import {
 } from '../checkers/packages.js';
 import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
+import { auditManifests } from '../checkers/manifests.js';
+import { detectHardcodedSecrets } from '../checkers/secrets.js';
 
 export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.1.0'
+      version: '1.2.0'
     },
     {
       capabilities: {
@@ -52,6 +54,36 @@ export function createAgentGuardServer() {
               }
             },
             required: ['packageName']
+          }
+        },
+        {
+          name: 'audit_manifests',
+          description:
+            'Scans all project manifest files (package.json, requirements.txt, Cargo.toml) to detect hallucinated or unverified dependencies across the whole codebase.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: {
+                type: 'string',
+                description: 'Target root directory to scan (default: current directory)'
+              }
+            }
+          }
+        },
+        {
+          name: 'detect_secret_leaks',
+          description:
+            'Scans modified or generated code for accidentally hardcoded API keys, tokens, or private credentials.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              files: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'List of files to scan for leaks'
+              }
+            },
+            required: ['files']
           }
         },
         {
@@ -122,6 +154,32 @@ export function createAgentGuardServer() {
           {
             type: 'text',
             text: JSON.stringify(res, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'audit_manifests') {
+      const dir = String(args?.directory || process.cwd());
+      const report = await auditManifests(dir);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(report, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'detect_secret_leaks') {
+      const files = (args?.files as string[]) || [];
+      const report = await detectHardcodedSecrets(files);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(report, null, 2)
           }
         ]
       };
