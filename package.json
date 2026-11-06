@@ -13,6 +13,14 @@
     "start": "node dist/cli/index.js",
     "test": "tsx tests/verify.ts"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/francaroscillidev-gif/agentguard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/francaroscillidev-gif/agentguard/issues"
+  },
+  "homepage": "https://github.com/francaroscillidev-gif/agentguard#readme",
   "keywords": [
     "ai",
     "agent",
@@ -30,7 +38,7 @@
     "pypi",
     "npm"
   ],
-  "author": "AgentGuard Open Source Community",
+  "author": "Franca Roscilli <francaroscillidev@gmail.com> (https://github.com/francaroscillidev-gif)",
   "license": "Apache-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
