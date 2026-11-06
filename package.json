@@ -1,7 +1,7 @@
 {
-  "name": "agentguard",
-  "version": "1.0.0",
-  "description": "🛡️ The open-source AI Integrity Sentinel: Prevents AI dependency hallucinations, code degradation, and cognitive drift.",
+  "name": "@francaroscillidev/agentguard",
+  "version": "1.1.0",
+  "description": "🛡️ The open-source AI Integrity Sentinel: Prevents AI dependency hallucinations across npm, PyPI, Crates.io & Go, code degradation, and cognitive drift.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,11 @@
     "hallucination-prevention",
     "supply-chain-security",
     "slop-detector",
-    "code-integrity"
+    "code-integrity",
+    "crates",
+    "golang",
+    "pypi",
+    "npm"
   ],
   "author": "AgentGuard Open Source Community",
   "license": "Apache-2.0",

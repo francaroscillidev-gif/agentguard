@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { verifyNpmPackage, verifyPyPIPackage } from '../checkers/packages.js';
+import {
+  verifyNpmPackage,
+  verifyPyPIPackage,
+  verifyCratesPackage,
+  verifyGoModule,
+  Ecosystem
+} from '../checkers/packages.js';
 import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
 import { runServer } from '../mcp/server.js';
@@ -11,20 +17,28 @@ const program = new Command();
 program
   .name('agentguard')
   .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.0.0');
+  .version('1.1.0');
 
 // Verify package CLI
 program
   .command('check-package <name>')
   .description('Verify if a package is genuine or an AI hallucination / recent typosquat')
-  .option('-e, --ecosystem <ecosystem>', 'npm or pypi', 'npm')
+  .option('-e, --ecosystem <ecosystem>', 'npm, pypi, crates, or golang', 'npm')
   .option('-d, --days <days>', 'Minimum safe days since release', '30')
   .action(async (name, options) => {
-    console.log(chalk.blue(`\n🔍 Verifying dependency '${name}' on ${options.ecosystem}...`));
-    const result =
-      options.ecosystem === 'pypi'
-        ? await verifyPyPIPackage(name, { minAgeDays: Number(options.days) })
-        : await verifyNpmPackage(name, { minAgeDays: Number(options.days) });
+    const eco = options.ecosystem as Ecosystem;
+    console.log(chalk.blue(`\n🔍 Verifying dependency '${name}' on ${eco}...`));
+
+    let result;
+    if (eco === 'pypi') {
+      result = await verifyPyPIPackage(name, { minAgeDays: Number(options.days) });
+    } else if (eco === 'crates') {
+      result = await verifyCratesPackage(name, { minAgeDays: Number(options.days) });
+    } else if (eco === 'golang') {
+      result = await verifyGoModule(name, { minAgeDays: Number(options.days) });
+    } else {
+      result = await verifyNpmPackage(name, { minAgeDays: Number(options.days) });
+    }
 
     if (!result.exists) {
       console.log(chalk.red.bold(`\n❌ BLOCKED: Package does not exist!`));
@@ -37,9 +51,9 @@ program
       result.warnings.forEach((w) => console.log(chalk.yellow(`  • ${w}`)));
     } else {
       console.log(chalk.green.bold(`\n✅ SAFE: Package verified.`));
-      console.log(chalk.gray(`  Version: ${result.version}`));
+      if (result.version) console.log(chalk.gray(`  Version: ${result.version}`));
       if (result.ageDays !== undefined) console.log(chalk.gray(`  Age: ${result.ageDays} days`));
-      if (result.weeklyDownloads !== undefined) console.log(chalk.gray(`  Weekly Downloads: ${result.weeklyDownloads}`));
+      if (result.weeklyDownloads !== undefined) console.log(chalk.gray(`  Downloads: ${result.weeklyDownloads}`));
     }
   });
 
@@ -47,19 +61,46 @@ program
 program
   .command('audit-slop [directory]')
   .description('Scan project for AI boilerplate, duplicate reinvented utils, and fake placeholders')
-  .action(async (directory = process.cwd()) => {
-    console.log(chalk.blue(`\n🧹 Scanning for AI Slop & Code Degradation in ${directory}...`));
+  .option('--format <format>', 'Output format: human, json, or markdown', 'human')
+  .action(async (directory = process.cwd(), options) => {
+    if (options.format === 'human') {
+      console.log(chalk.blue(`\n🧹 Scanning for AI Slop & Code Degradation in ${directory}...`));
+    }
+
     const report = await analyzeCodeSlop(directory);
+
+    if (options.format === 'json') {
+      console.log(JSON.stringify(report, null, 2));
+      if (!report.passed) process.exitCode = 1;
+      return;
+    }
+
+    if (options.format === 'markdown') {
+      console.log(`### 🛡️ AgentGuard Slop Audit Report\n`);
+      console.log(`- **Total Issues:** ${report.totalIssues}`);
+      console.log(`- **High Severity:** ${report.highSeverityCount}`);
+      console.log(`- **Status:** ${report.passed ? '✅ Passed' : '❌ Failed'}\n`);
+      if (report.detections.length > 0) {
+        console.log(`| File | Category | Severity | Issue |`);
+        console.log(`|---|---|---|---|`);
+        report.detections.forEach((d) => {
+          console.log(`| \`${d.filePath}${d.line ? ':' + d.line : ''}\` | ${d.category} | ${d.severity} | ${d.description} |`);
+        });
+      }
+      if (!report.passed) process.exitCode = 1;
+      return;
+    }
 
     if (report.detections.length === 0) {
       console.log(chalk.green.bold('\n✨ No AI slop or duplicate utilities detected! Codebase is clean.'));
       return;
     }
 
-    console.log(chalk.yellow.bold(`\nFound ${report.totalIssues} potential AI integrity issues:`));
+    console.log(chalk.yellow.bold(`\nFound ${report.totalIssues} potential AI integrity issues (${report.highSeverityCount} high severity):`));
     for (const d of report.detections) {
       const tag = d.severity === 'high' ? chalk.red('[HIGH]') : chalk.yellow('[WARN]');
-      console.log(`\n${tag} ${chalk.cyan(d.filePath)} - ${d.category}`);
+      const lineStr = d.line ? `:${d.line}` : '';
+      console.log(`\n${tag} ${chalk.cyan(d.filePath + lineStr)} - ${d.category}`);
       console.log(`   ${d.description}`);
       console.log(chalk.gray(`   💡 Suggestion: ${d.suggestion}`));
     }

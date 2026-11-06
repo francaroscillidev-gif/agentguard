@@ -4,7 +4,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import { verifyNpmPackage, verifyPyPIPackage } from '../checkers/packages.js';
+import {
+  verifyNpmPackage,
+  verifyPyPIPackage,
+  verifyCratesPackage,
+  verifyGoModule,
+  Ecosystem
+} from '../checkers/packages.js';
 import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
 
@@ -12,7 +18,7 @@ export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.0.0'
+      version: '1.1.0'
     },
     {
       capabilities: {
@@ -21,24 +27,23 @@ export function createAgentGuardServer() {
     }
   );
 
-  // List available tools for AI agents
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
       tools: [
         {
           name: 'verify_package',
           description:
-            'Verifies if an npm or PyPI dependency really exists, has not been hallucinated by an LLM, and is safe from typosquatting/malicious recent uploads.',
+            'Verifies if an npm, PyPI, crates.io, or Go dependency genuinely exists, has not been hallucinated by an LLM, and is safe from typosquatting / malicious recent uploads.',
           inputSchema: {
             type: 'object',
             properties: {
               packageName: {
                 type: 'string',
-                description: 'The package name to verify (e.g. "lodash", "react-router-dom-v7-fix")'
+                description: 'The package/module name (e.g. "lodash", "requests", "serde", "github.com/gin-gonic/gin")'
               },
               ecosystem: {
                 type: 'string',
-                enum: ['npm', 'pypi'],
+                enum: ['npm', 'pypi', 'crates', 'golang'],
                 description: 'Package registry ecosystem (default: npm)'
               },
               minAgeDays: {
@@ -52,7 +57,7 @@ export function createAgentGuardServer() {
         {
           name: 'analyze_code_slop',
           description:
-            'Audits codebase for redundant AI-generated boilerplate, placeholder comments ("// in production..."), and duplicate reinventions of existing utility functions.',
+            'Audits codebase for redundant AI-generated boilerplate, placeholder comments ("// in production..."), lazy fake stubs, and duplicate reinventions of existing utility functions.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -87,19 +92,30 @@ export function createAgentGuardServer() {
     };
   });
 
-  // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
     if (name === 'verify_package') {
       const pkg = String(args?.packageName);
-      const eco = (args?.ecosystem as 'npm' | 'pypi') || 'npm';
+      const eco = (args?.ecosystem as Ecosystem) || 'npm';
       const minAge = args?.minAgeDays ? Number(args.minAgeDays) : 30;
 
-      const res =
-        eco === 'pypi'
-          ? await verifyPyPIPackage(pkg, { minAgeDays: minAge })
-          : await verifyNpmPackage(pkg, { minAgeDays: minAge });
+      let res;
+      switch (eco) {
+        case 'pypi':
+          res = await verifyPyPIPackage(pkg, { minAgeDays: minAge });
+          break;
+        case 'crates':
+          res = await verifyCratesPackage(pkg, { minAgeDays: minAge });
+          break;
+        case 'golang':
+          res = await verifyGoModule(pkg, { minAgeDays: minAge });
+          break;
+        case 'npm':
+        default:
+          res = await verifyNpmPackage(pkg, { minAgeDays: minAge });
+          break;
+      }
 
       return {
         content: [

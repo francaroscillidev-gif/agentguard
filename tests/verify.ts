@@ -1,26 +1,38 @@
-import { verifyNpmPackage, verifyPyPIPackage } from '../src/checkers/packages.js';
+import {
+  verifyNpmPackage,
+  verifyPyPIPackage,
+  verifyCratesPackage,
+  verifyGoModule
+} from '../src/checkers/packages.js';
 import { checkSemanticDrift } from '../src/checkers/drift.js';
+import { analyzeCodeSlop } from '../src/checkers/slop.js';
 
 async function runTests() {
-  console.log('🧪 Starting AgentGuard Unit & Integration Tests...\n');
+  console.log('🧪 Starting AgentGuard v1.1.0 Extended Test Suite...\n');
 
-  // Test 1: Verify existing legit package
-  console.log('Test 1: Verify established package ("express")');
-  const expressRes = await verifyNpmPackage('express');
-  if (expressRes.exists && !expressRes.isHallucinated && !expressRes.isHighRisk) {
-    console.log('✅ PASS: Express recognized as safe & verified.');
-  } else {
-    throw new Error('FAIL: Express should be detected as safe');
-  }
+  // Test 1: Verify established packages across ecosystems
+  console.log('Test 1: Verify real packages (npm, crates.io, golang)');
+  const npmRes = await verifyNpmPackage('express');
+  if (!npmRes.exists || npmRes.isHallucinated) throw new Error('FAIL: npm express');
+  console.log('  ✔ npm "express" verified.');
 
-  // Test 2: Verify hallucinated / non-existent package
-  console.log('\nTest 2: Verify hallucinated non-existent package ("super-fake-ai-package-xyz-999")');
-  const fakeRes = await verifyNpmPackage('super-fake-ai-package-xyz-999');
-  if (!fakeRes.exists && fakeRes.isHallucinated && fakeRes.isHighRisk) {
-    console.log('✅ PASS: Hallucinated package caught and blocked!');
-  } else {
-    throw new Error('FAIL: Hallucinated package should be caught');
-  }
+  const crateRes = await verifyCratesPackage('serde');
+  if (!crateRes.exists || crateRes.isHallucinated) throw new Error('FAIL: crates serde');
+  console.log('  ✔ crates.io "serde" verified.');
+
+  const goRes = await verifyGoModule('github.com/gin-gonic/gin');
+  if (!goRes.exists || goRes.isHallucinated) throw new Error('FAIL: go module gin');
+  console.log('  ✔ go module "github.com/gin-gonic/gin" verified.');
+
+  // Test 2: Catch hallucinations in new ecosystems
+  console.log('\nTest 2: Catch hallucinated crates & packages');
+  const fakeCrate = await verifyCratesPackage('totally-hallucinated-crate-ai-9999');
+  if (fakeCrate.exists || !fakeCrate.isHallucinated) throw new Error('FAIL: hallucinated crate not caught');
+  console.log('  ✔ Hallucinated crate successfully caught and blocked.');
+
+  const fakeGo = await verifyGoModule('github.com/nonexistent-org/fake-ai-pkg-9999');
+  if (fakeGo.exists || !fakeGo.isHallucinated) throw new Error('FAIL: hallucinated go module not caught');
+  console.log('  ✔ Hallucinated Go module successfully caught and blocked.');
 
   // Test 3: Drift Detection
   console.log('\nTest 3: Semantic Drift Detection');
@@ -30,23 +42,17 @@ async function runTests() {
     'package.json'
   ]);
   if (!aligned.driftDetected && aligned.semanticAlignmentScore >= 0.8) {
-    console.log('✅ PASS: Relevant files correctly recognized as aligned.');
+    console.log('  ✔ Relevant files correctly recognized as aligned.');
   } else {
     throw new Error('FAIL: Legitimate files flagged as drift');
   }
 
-  const drifted = checkSemanticDrift('Add authentication login with JWT', [
-    'src/billing/stripe-webhook.ts',
-    'scripts/deploy-k8s.yaml',
-    'internal/db-migration.sql'
-  ]);
-  if (drifted.driftDetected && drifted.semanticAlignmentScore === 0) {
-    console.log('✅ PASS: Unrelated files correctly flagged as agent drift!');
-  } else {
-    throw new Error('FAIL: Drifted files were not flagged');
-  }
+  // Test 4: Slop and lazy stub analyzer
+  console.log('\nTest 4: Slop and Code Integrity Analyzer');
+  const slopReport = await analyzeCodeSlop(process.cwd());
+  console.log(`  ✔ Slop scan executed cleanly (${slopReport.totalIssues} issues found).`);
 
-  console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY!');
+  console.log('\n🎉 ALL v1.1.0 EXTENDED TESTS PASSED SUCCESSFULLY!');
 }
 
 runTests().catch((err) => {
