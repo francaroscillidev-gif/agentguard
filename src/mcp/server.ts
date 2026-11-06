@@ -15,12 +15,13 @@ import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
 import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
+import { auditCodeSmells } from '../checkers/smells.js';
 
 export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.2.0'
+      version: '1.3.0'
     },
     {
       capabilities: {
@@ -84,6 +85,20 @@ export function createAgentGuardServer() {
               }
             },
             required: ['files']
+          }
+        },
+        {
+          name: 'audit_code_smells',
+          description:
+            'Detects dangerous AI coding antipatterns like swallowed exceptions (catch {}), eval(), and suppressed type errors (@ts-ignore).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: {
+                type: 'string',
+                description: 'Target root directory to scan (default: current directory)'
+              }
+            }
           }
         },
         {
@@ -175,6 +190,19 @@ export function createAgentGuardServer() {
     if (name === 'detect_secret_leaks') {
       const files = (args?.files as string[]) || [];
       const report = await detectHardcodedSecrets(files);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(report, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'audit_code_smells') {
+      const dir = String(args?.directory || process.cwd());
+      const report = await auditCodeSmells(dir);
       return {
         content: [
           {

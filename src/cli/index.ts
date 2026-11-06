@@ -13,6 +13,8 @@ import { analyzeCodeSlop } from '../checkers/slop.js';
 import { checkSemanticDrift } from '../checkers/drift.js';
 import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
+import { installGitHook } from '../checkers/githook.js';
+import { auditCodeSmells } from '../checkers/smells.js';
 import { runServer } from '../mcp/server.js';
 
 const program = new Command();
@@ -20,7 +22,22 @@ const program = new Command();
 program
   .name('agentguard')
   .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.2.0');
+  .version('1.3.0');
+
+// Install Git Hook
+program
+  .command('install-hook')
+  .description('Install AgentGuard as a native Git pre-commit hook in your repository')
+  .action(async () => {
+    try {
+      const res = await installGitHook();
+      console.log(chalk.green.bold(`\n✅ ${res.message}`));
+      console.log(chalk.gray(`  Installed at: ${res.hookPath}`));
+    } catch (err: any) {
+      console.log(chalk.red.bold(`\n❌ Failed to install git hook: ${err.message}`));
+      process.exit(1);
+    }
+  });
 
 // Verify single package CLI
 program
@@ -118,6 +135,26 @@ program
         console.log(chalk.gray(`    ${d.snippet}`));
       });
       process.exitCode = 1;
+    }
+  });
+
+// Audit code smells
+program
+  .command('audit-smells [directory]')
+  .description('Detect dangerous AI coding antipatterns like swallowed exceptions (catch {}), eval(), and suppressed type errors')
+  .action(async (directory = process.cwd()) => {
+    console.log(chalk.blue(`\n🔍 Scanning for AI Code Smells in ${directory}...`));
+    const report = await auditCodeSmells(directory);
+
+    if (report.totalSmells === 0) {
+      console.log(chalk.green.bold('✨ No dangerous AI code smells found!'));
+    } else {
+      console.log(chalk.yellow.bold(`\nFound ${report.totalSmells} code smells:`));
+      report.smells.forEach((s) => {
+        console.log(`\n${chalk.red(`[${s.severity.toUpperCase()}]`)} ${chalk.cyan(s.filePath + ':' + s.line)} - ${s.type}`);
+        console.log(`   ${chalk.gray(s.details)}`);
+        console.log(chalk.yellow(`   💡 ${s.recommendation}`));
+      });
     }
   });
 
