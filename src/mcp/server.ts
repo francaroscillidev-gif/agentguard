@@ -17,13 +17,14 @@ import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { auditCodeSmells } from '../checkers/smells.js';
 import { detectPromptInjections } from '../checkers/injections.js';
+import { inspectShadowDiff } from '../checkers/shadowdiff.js';
 import { autoFixCodeSmells } from '../fixers/autofix.js';
 
 export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.5.0'
+      version: '1.6.0'
     },
     {
       capabilities: {
@@ -57,6 +58,25 @@ export function createAgentGuardServer() {
               }
             },
             required: ['packageName']
+          }
+        },
+        {
+          name: 'inspect_shadow_diff',
+          description:
+            'Analyzes git diff or proposed additions for stealthy unprompted network calls, obfuscated payloads, or prototype manipulations.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              diff: {
+                type: 'string',
+                description: 'Unified diff content or patch string'
+              },
+              taskSummary: {
+                type: 'string',
+                description: 'The task description the agent was asked to perform'
+              }
+            },
+            required: ['diff', 'taskSummary']
           }
         },
         {
@@ -194,6 +214,20 @@ export function createAgentGuardServer() {
           break;
       }
 
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(res, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'inspect_shadow_diff') {
+      const diff = String(args?.diff || '');
+      const task = String(args?.taskSummary || '');
+      const res = inspectShadowDiff(diff, task);
       return {
         content: [
           {
