@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "rules": {
+    "npm": {
+      "minAgeDays": 30,
+      "minWeeklyDownloads": 100
+    },
+    "pypi": {
+      "minAgeDays": 30
+    },
+    "crates": {
+      "minAgeDays": 30
+    },
+    "golang": {
+      "minAgeDays": 30
+    }
+  },
+  "secrets": {
+    "enabled": true
+  },
+  "slop": {
+    "enabled": true,
+    "maxAllowedDuplicates": 1
+  }
+}

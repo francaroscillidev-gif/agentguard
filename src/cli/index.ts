@@ -15,6 +15,8 @@ import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { installGitHook } from '../checkers/githook.js';
 import { auditCodeSmells } from '../checkers/smells.js';
+import { initConfigFile, loadConfig } from '../config/loader.js';
+import { generateFullMarkdownReport } from '../reporters/markdown.js';
 import { runServer } from '../mcp/server.js';
 
 const program = new Command();
@@ -22,7 +24,84 @@ const program = new Command();
 program
   .name('agentguard')
   .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.3.0');
+  .version('1.4.0');
+
+// Init configuration file
+program
+  .command('init')
+  .description('Generate a customizable .agentguardrc.json configuration file')
+  .action(async () => {
+    try {
+      const p = await initConfigFile();
+      console.log(chalk.green.bold('\n✅ Configuration initialized!'));
+      console.log(chalk.gray(`  Created: ${p}`));
+    } catch (err: any) {
+      console.log(chalk.red.bold(`\n❌ Failed to create config: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+// Comprehensive Full Workspace Audit
+program
+  .command('audit [directory]')
+  .description('Run all checks (manifests, secrets, code smells, slop) and generate a unified report')
+  .option('--format <format>', 'Output format: human, json, or markdown', 'human')
+  .action(async (directory = process.cwd(), options) => {
+    const config = await loadConfig(directory);
+
+    if (options.format === 'human') {
+      console.log(chalk.blue(`\n🛡️  Running AgentGuard Comprehensive Audit in ${directory}...\n`));
+    }
+
+    // 1. Manifests
+    const manifestsReport = await auditManifests(directory);
+
+    // 2. Secrets
+    const filesToScan = await fg(['src/**/*.{ts,js,py}', '**/*.{ts,js,py}'], {
+      cwd: directory,
+      ignore: ['**/node_modules/**', '**/dist/**']
+    });
+    const secretsReport = await detectHardcodedSecrets(filesToScan, directory);
+
+    // 3. Smells
+    const smellsReport = await auditCodeSmells(directory);
+
+    // 4. Slop
+    const slopReport = await analyzeCodeSlop(directory);
+
+    const auditData = {
+      manifests: manifestsReport,
+      secrets: secretsReport,
+      smells: smellsReport,
+      slop: slopReport
+    };
+
+    if (options.format === 'json') {
+      console.log(JSON.stringify(auditData, null, 2));
+      if (!manifestsReport.passed || !secretsReport.passed) process.exitCode = 1;
+      return;
+    }
+
+    if (options.format === 'markdown') {
+      console.log(generateFullMarkdownReport(auditData));
+      if (!manifestsReport.passed || !secretsReport.passed) process.exitCode = 1;
+      return;
+    }
+
+    // Human output
+    console.log(chalk.bold('--- AUDIT SUMMARY ---'));
+    console.log(`📦 Manifest Dependencies: ${manifestsReport.hallucinatedCount === 0 ? chalk.green('Passed') : chalk.red(`${manifestsReport.hallucinatedCount} hallucinated!`)}`);
+    console.log(`🔑 Secret Credential Leaks: ${secretsReport.totalLeaks === 0 ? chalk.green('None') : chalk.red(`${secretsReport.totalLeaks} critical leaks!`)}`);
+    console.log(`🦹 AI Code Smells: ${smellsReport.totalSmells === 0 ? chalk.green('Clean') : chalk.yellow(`${smellsReport.totalSmells} detected`)}`);
+    console.log(`🧹 AI Slop & Duplication: ${slopReport.passed ? chalk.green('Clean') : chalk.yellow(`${slopReport.totalIssues} issues`)}`);
+
+    if (!manifestsReport.passed || !secretsReport.passed) {
+      console.log(chalk.red.bold('\n❌ AUDIT FAILED: Fix critical issues above.'));
+      process.exitCode = 1;
+    } else {
+      console.log(chalk.green.bold('\n✨ ALL AUDIT CHECKS PASSED! Codebase is safe and sound.'));
+    }
+  });
 
 // Install Git Hook
 program

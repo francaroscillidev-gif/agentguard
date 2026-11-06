@@ -26,10 +26,14 @@ As autonomous AI Coding Agents (Claude Code, Cursor, Antigravity, Devin, Copilot
 
 ---
 
-## ⚡ What AgentGuard v1.3.0 Solves
+## ⚡ What AgentGuard v1.4.0 Solves
 
-AgentGuard acts as an **autonomous MCP Server** and a **Git Pre-Commit Hook**:
+AgentGuard acts as an **autonomous MCP Server**, a **unified auditor**, and a **Git Pre-Commit Hook**:
 
+* 🛡️ **Comprehensive All-in-One Audit (`agentguard audit`):**
+  - Runs all checks simultaneously (Manifests, Secrets, Smells, Slop) and outputs in **Human**, **JSON**, or **Markdown** (for GitHub PR comments).
+* ⚙️ **Configurable Guardrails (`agentguard init`):**
+  - Generates `.agentguardrc.json` to customize thresholds (minimum package age, blocked/allowed libraries, strict checks).
 * 🌐 **Multi-Ecosystem Anti-Hallucination:**
   - Validates **npm**, **PyPI**, **crates.io** (Rust), and **proxy.golang.org** (Go).
   - Flags packages released <30 days ago or with dangerously low adoption.
@@ -41,8 +45,6 @@ AgentGuard acts as an **autonomous MCP Server** and a **Git Pre-Commit Hook**:
   - Flags swallowed exceptions (`catch {}`), `eval()`, and `@ts-ignore`.
 * ⚓ **Native Git Pre-Commit Hook (`install-hook`):**
   - Installs a zero-dependency pre-commit guard in `.git/hooks/pre-commit` to prevent committing hallucinations and secrets.
-* 🧭 **Semantic Scope Drift Sentinel (`check-drift`):**
-  - Measures alignment between user intent and modified files.
 
 ---
 
@@ -57,13 +59,31 @@ npx @francaroscillidev/agentguard --help
 npm install -g @francaroscillidev/agentguard
 ```
 
-### 1. Install Pre-Commit Hook in Your Repo
+### 1. Comprehensive Project Audit
+```bash
+# Terminal summary
+agentguard audit
+
+# Markdown report (ideal for GitHub Actions & PR comments)
+agentguard audit --format markdown
+
+# JSON report (for CI pipelines)
+agentguard audit --format json
+```
+
+### 2. Initialize Custom Config File
+```bash
+agentguard init
+```
+Generates `.agentguardrc.json` in your repository root.
+
+### 3. Install Pre-Commit Hook in Your Repo
 ```bash
 agentguard install-hook
 ```
 *Now, every `git commit` automatically validates staged files for secret leaks and verifies modified manifests!*
 
-### 2. Verify Single Dependencies
+### 4. Verify Single Dependencies
 ```bash
 # npm
 agentguard check-package react
@@ -76,25 +96,6 @@ agentguard check-package requests -e pypi
 
 # Go (proxy.golang.org)
 agentguard check-package github.com/gin-gonic/gin -e golang
-```
-
-### 3. Audit Full Project Manifests
-```bash
-agentguard audit-manifests
-```
-
-### 4. Scan for Secrets & AI Code Smells
-```bash
-# Scan for API keys or credentials
-agentguard scan-secrets
-
-# Scan for swallowed errors & dangerous antipatterns
-agentguard audit-smells
-```
-
-### 5. Audit Codebase for AI Slop
-```bash
-agentguard audit-slop --format markdown
 ```
 
 ---
@@ -126,4 +127,5 @@ Add **AgentGuard** to your agent configuration (`claude_desktop_config.json`, An
 
 ## 📄 License
 
-Apache License 2.0. Open-source and free for all developers and AI agent platforms.
+Apache License 2.0. Copyright (c) 2026 Franca Roscilli (https://github.com/francaroscillidev-gif).
+Open-source and free for all developers and AI agent platforms.
