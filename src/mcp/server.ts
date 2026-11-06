@@ -16,12 +16,14 @@ import { checkSemanticDrift } from '../checkers/drift.js';
 import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { auditCodeSmells } from '../checkers/smells.js';
+import { detectPromptInjections } from '../checkers/injections.js';
+import { autoFixCodeSmells } from '../fixers/autofix.js';
 
 export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.3.0'
+      version: '1.5.0'
     },
     {
       capabilities: {
@@ -55,6 +57,20 @@ export function createAgentGuardServer() {
               }
             },
             required: ['packageName']
+          }
+        },
+        {
+          name: 'detect_prompt_injections',
+          description:
+            'Scans files for indirect prompt injection vectors, jailbreak payloads, and instruction overrides hidden in comments or markdown.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: {
+                type: 'string',
+                description: 'Target root directory to scan (default: current directory)'
+              }
+            }
           }
         },
         {
@@ -97,6 +113,20 @@ export function createAgentGuardServer() {
               directory: {
                 type: 'string',
                 description: 'Target root directory to scan (default: current directory)'
+              }
+            }
+          }
+        },
+        {
+          name: 'autofix_smells',
+          description:
+            'Automatically fixes lazy AI code smells (replaces swallowed catch blocks with logging, replaces ts-ignore with ts-expect-error).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: {
+                type: 'string',
+                description: 'Target root directory to fix (default: current directory)'
               }
             }
           }
@@ -164,6 +194,32 @@ export function createAgentGuardServer() {
           break;
       }
 
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(res, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'detect_prompt_injections') {
+      const dir = String(args?.directory || process.cwd());
+      const report = await detectPromptInjections(dir);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(report, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'autofix_smells') {
+      const dir = String(args?.directory || process.cwd());
+      const res = await autoFixCodeSmells(dir);
       return {
         content: [
           {

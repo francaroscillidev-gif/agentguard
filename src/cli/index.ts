@@ -15,6 +15,8 @@ import { auditManifests } from '../checkers/manifests.js';
 import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { installGitHook } from '../checkers/githook.js';
 import { auditCodeSmells } from '../checkers/smells.js';
+import { detectPromptInjections } from '../checkers/injections.js';
+import { autoFixCodeSmells } from '../fixers/autofix.js';
 import { initConfigFile, loadConfig } from '../config/loader.js';
 import { generateFullMarkdownReport } from '../reporters/markdown.js';
 import { runServer } from '../mcp/server.js';
@@ -24,7 +26,7 @@ const program = new Command();
 program
   .name('agentguard')
   .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.4.0');
+  .version('1.5.0');
 
 // Init configuration file
 program
@@ -44,7 +46,7 @@ program
 // Comprehensive Full Workspace Audit
 program
   .command('audit [directory]')
-  .description('Run all checks (manifests, secrets, code smells, slop) and generate a unified report')
+  .description('Run all checks (manifests, secrets, injections, smells, slop) and generate a unified report')
   .option('--format <format>', 'Output format: human, json, or markdown', 'human')
   .action(async (directory = process.cwd(), options) => {
     const config = await loadConfig(directory);
@@ -63,28 +65,32 @@ program
     });
     const secretsReport = await detectHardcodedSecrets(filesToScan, directory);
 
-    // 3. Smells
+    // 3. Prompt Injections
+    const injectionsReport = await detectPromptInjections(directory);
+
+    // 4. Smells
     const smellsReport = await auditCodeSmells(directory);
 
-    // 4. Slop
+    // 5. Slop
     const slopReport = await analyzeCodeSlop(directory);
 
     const auditData = {
       manifests: manifestsReport,
       secrets: secretsReport,
+      injections: injectionsReport,
       smells: smellsReport,
       slop: slopReport
     };
 
     if (options.format === 'json') {
       console.log(JSON.stringify(auditData, null, 2));
-      if (!manifestsReport.passed || !secretsReport.passed) process.exitCode = 1;
+      if (!manifestsReport.passed || !secretsReport.passed || !injectionsReport.passed) process.exitCode = 1;
       return;
     }
 
     if (options.format === 'markdown') {
       console.log(generateFullMarkdownReport(auditData));
-      if (!manifestsReport.passed || !secretsReport.passed) process.exitCode = 1;
+      if (!manifestsReport.passed || !secretsReport.passed || !injectionsReport.passed) process.exitCode = 1;
       return;
     }
 
@@ -92,14 +98,54 @@ program
     console.log(chalk.bold('--- AUDIT SUMMARY ---'));
     console.log(`📦 Manifest Dependencies: ${manifestsReport.hallucinatedCount === 0 ? chalk.green('Passed') : chalk.red(`${manifestsReport.hallucinatedCount} hallucinated!`)}`);
     console.log(`🔑 Secret Credential Leaks: ${secretsReport.totalLeaks === 0 ? chalk.green('None') : chalk.red(`${secretsReport.totalLeaks} critical leaks!`)}`);
+    console.log(`🎯 Prompt Injection Defense: ${injectionsReport.passed ? chalk.green('Protected') : chalk.red(`${injectionsReport.totalDetections} threats!`)}`);
     console.log(`🦹 AI Code Smells: ${smellsReport.totalSmells === 0 ? chalk.green('Clean') : chalk.yellow(`${smellsReport.totalSmells} detected`)}`);
     console.log(`🧹 AI Slop & Duplication: ${slopReport.passed ? chalk.green('Clean') : chalk.yellow(`${slopReport.totalIssues} issues`)}`);
 
-    if (!manifestsReport.passed || !secretsReport.passed) {
-      console.log(chalk.red.bold('\n❌ AUDIT FAILED: Fix critical issues above.'));
+    if (!manifestsReport.passed || !secretsReport.passed || !injectionsReport.passed) {
+      console.log(chalk.red.bold('\n❌ AUDIT FAILED: Critical risks detected.'));
       process.exitCode = 1;
     } else {
       console.log(chalk.green.bold('\n✨ ALL AUDIT CHECKS PASSED! Codebase is safe and sound.'));
+    }
+  });
+
+// Auto-fix command
+program
+  .command('fix [directory]')
+  .description('Automatically fix lazy AI artifacts (replace swallowed errors with logging, sanitize @ts-ignore)')
+  .action(async (directory = process.cwd()) => {
+    console.log(chalk.blue(`\n🔧 Running AgentGuard Auto-Fixer in ${directory}...`));
+    const result = await autoFixCodeSmells(directory);
+
+    if (result.filesModified.length === 0) {
+      console.log(chalk.green.bold('\n✨ No autofixable issues found. Code is already clean!'));
+      return;
+    }
+
+    console.log(chalk.green.bold(`\n✅ Auto-fix complete! Modified ${result.filesModified.length} files:`));
+    console.log(`  • Swallowed catch exceptions fixed: ${result.swallowedErrorsFixed}`);
+    console.log(`  • TypeScript ignores converted: ${result.tsIgnoreFixed}`);
+    result.filesModified.forEach((f) => console.log(chalk.gray(`  - ${f}`)));
+  });
+
+// Scan prompt injections
+program
+  .command('scan-injections [directory]')
+  .description('Scan project for indirect prompt injections and hidden LLM jailbreaks in comments/markdown')
+  .action(async (directory = process.cwd()) => {
+    console.log(chalk.blue(`\n🎯 Scanning for indirect prompt injections in ${directory}...`));
+    const res = await detectPromptInjections(directory);
+
+    if (res.passed) {
+      console.log(chalk.green.bold('✨ No prompt injections detected. Agent inputs are safe.'));
+    } else {
+      console.log(chalk.red.bold(`\n🚨 DETECTED ${res.totalDetections} PROMPT INJECTION PAYLOADS:`));
+      res.detections.forEach((d) => {
+        console.log(chalk.red(`  • [${d.patternType}] in ${d.filePath}:${d.line}`));
+        console.log(chalk.gray(`    "${d.snippet}"`));
+      });
+      process.exitCode = 1;
     }
   });
 

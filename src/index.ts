@@ -5,6 +5,8 @@ export * from './checkers/manifests.js';
 export * from './checkers/secrets.js';
 export * from './checkers/githook.js';
 export * from './checkers/smells.js';
+export * from './checkers/injections.js';
+export * from './fixers/autofix.js';
 export * from './config/schema.js';
 export * from './config/loader.js';
 export * from './reporters/markdown.js';
