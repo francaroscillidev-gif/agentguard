@@ -107,6 +107,17 @@ Add **AgentGuard** to your agent configuration (`claude_desktop_config.json`, An
 
 ---
 
+## 📬 Contact, Support & Commercial Inquiries
+
+If you have questions, feedback, enterprise integration requests, or custom agent governance needs, feel free to reach out directly:
+
+- **Lead Developer & Maintainer:** Franca Roscilli
+- **Email:** [francaroscillidev@gmail.com](mailto:francaroscillidev@gmail.com)
+- **GitHub:** [@francaroscillidev-gif](https://github.com/francaroscillidev-gif)
+- **Bug Reports & Feature Requests:** [Open an issue on GitHub](https://github.com/francaroscillidev-gif/agentguard/issues)
+
+---
+
 ## 📄 License
 
 Apache License 2.0. Copyright (c) 2026 Franca Roscilli (https://github.com/francaroscillidev-gif).
