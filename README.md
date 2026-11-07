@@ -1,33 +1,42 @@
 # 🛡️ AgentGuard
 
-> **The enterprise-ready AI Integrity Sentinel & MCP Server preventing AI Dependency Hallucinations, Shadow Diff Tampering, Secret Leaks, Indirect Prompt Injections, and Code Degradation.**
+> **The enterprise-grade AI Sentinel & Execution Shield preventing AI Dependency Hallucinations, Destructive Shell Execution, Cognitive Infinite Loops, Shadow Diff Tampering, Secret Leaks, and Indirect Prompt Injections.**
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![npm version](https://img.shields.io/npm/v/@francaroscillidev/agentguard.svg)](https://www.npmjs.com/package/@francaroscillidev/agentguard)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
+[![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0_Ready-blueviolet.svg)](https://sarifweb.azurewebsites.net)
 [![MCP Ready](https://img.shields.io/badge/MCP-Compliant-brightgreen.svg)](https://modelcontextprotocol.io)
 
 ---
 
 ## 💥 The Critical Unsolved Problems in AI Coding
 
-Autonomous AI Coding Agents (Claude Code, Cursor, Antigravity, Devin, Copilot Workspace) introduce stealthy risks that bypass classical linters (ESLint, Prettier, SonarQube):
+Autonomous AI Coding Agents (Claude Code, Cursor, Antigravity, Devin, Copilot Workspace) introduce dangerous failure modes that completely bypass traditional linters (ESLint, Prettier, SonarQube):
 
-1. **AI Dependency Hallucination / Package Confusion:**
-   Agents invent fictitious libraries across npm, PyPI, Crates.io, and Go, opening repositories to supply chain poisoning.
-2. **Shadow Diff Tampering:**
-   During refactoring, agents sometimes introduce unprompted network requests, telemetry, or obfuscated blocks.
-3. **Indirect Prompt Injections & Jailbreaks:**
+1. **AI Dependency Hallucination / Package Squatting:**
+   Agents invent non-existent libraries across npm, PyPI, Crates.io, and Go, opening repositories to supply chain poisoning.
+2. **Destructive Shell Execution:**
+   Agents executing autonomous shell commands can run catastrophic actions (`rm -rf /`, `curl | bash`, `chmod 777`, reverse shells).
+3. **Cognitive Infinite Loops:**
+   Agents get caught in endless circular iterations (e.g. failing a test -> editing the test incorrectly -> retrying endlessly).
+4. **Shadow Diff Tampering:**
+   During long refactoring sessions, agents may introduce stealthy unprompted network calls, telemetry, or prototype pollution.
+5. **Indirect Prompt Injections & Jailbreaks:**
    Malicious instructions hidden in comments or third-party READMEs hijack the agent's behavior.
-4. **Hardcoded Secrets & API Keys:**
+6. **Hardcoded Secrets & API Keys:**
    Accidental exposure of real tokens (`sk-...`, GitHub PATs, AWS credentials).
-5. **AI Code Degradation & Lazy Stubs:**
-   Agents bypass errors with swallowed `catch (e) {}` blocks, `eval()`, or `@ts-ignore`.
 
 ---
 
-## ⚡ What AgentGuard v1.6.0 Delivers
+## ⚡ What AgentGuard v2.0.0 Delivers
 
+* 🛡️ **Execution Shield (`agentguard shield-exec` & `shield_command` MCP):**
+  - Intercepts shell tool-calls in runtime and blocks destructive commands with safe alternatives.
+* 🔄 **Cognitive Loop Breaker (`check_cognitive_loop` MCP):**
+  - Detects repetitive circular failure loops and prompts the agent or developer to halt execution.
+* 📊 **Industry-Standard SARIF 2.1.0 Export (`--format sarif`):**
+  - Native integration with **GitHub Advanced Security / Code Scanning tab** and GitLab SAST.
 * 🎖️ **AI Compliance & Hygiene Scoring (Tier A+ to F):**
   - Evaluates codebases with an objective 0–100 score across Supply Chain, Secrets, Injections, and Code Smells.
 * 🕵️ **Shadow Diff Inspector (`inspect_shadow_diff`):**
@@ -36,10 +45,8 @@ Autonomous AI Coding Agents (Claude Code, Cursor, Antigravity, Devin, Copilot Wo
   - Scans files for hidden jailbreaks and instruction overrides.
 * 🔧 **Automated Code Smell Fixer (`agentguard fix`):**
   - Safely refactors lazy agent artifacts (replaces swallowed errors with logging, converts `@ts-ignore` to `@ts-expect-error`).
-* 🤖 **Autonomous MCP Server:**
-  - Plugs directly into Claude Desktop, Antigravity, or Cursor.
-* 🚀 **Ready-to-Use GitHub Actions CI:**
-  - Automated PR auditing workflow in `.github/workflows/agentguard-audit.yml`.
+* ⚓ **Native Git Pre-Commit Hook (`agentguard install-hook`):**
+  - Zero-overhead safeguard blocking commits containing secret leaks or hallucinated packages.
 
 ---
 
@@ -54,23 +61,28 @@ npx @francaroscillidev/agentguard --help
 npm install -g @francaroscillidev/agentguard
 ```
 
-### 1. Comprehensive Project Audit with Compliance Scoring
+### 1. Run Comprehensive Audit with SARIF or Markdown Export
 ```bash
 # Terminal summary
 agentguard audit
 
 # Markdown report with Hygiene Score (ideal for PR comments)
 agentguard audit --format markdown
+
+# Standard SARIF 2.1.0 output for GitHub Code Scanning
+agentguard audit --format sarif > agentguard.sarif
 ```
 
-### 2. Auto-Fix Lazy AI Artifacts
+### 2. Shield Shell Commands from Destructive Agent Actions
+```bash
+agentguard shield-exec "rm -rf /"
+# 🚨 COMMAND BLOCKED [CRITICAL RISK]!
+# Reason: Destructive root or home recursive deletion detected.
+```
+
+### 3. Auto-Fix Lazy AI Code Smells
 ```bash
 agentguard fix
-```
-
-### 3. Scan for Indirect Prompt Injections
-```bash
-agentguard scan-injections
 ```
 
 ### 4. Install Native Git Pre-Commit Hook
@@ -95,8 +107,10 @@ Add **AgentGuard** to your agent configuration (`claude_desktop_config.json`, An
 }
 ```
 
-### Exposed MCP Tools:
+### Exposed MCP Tools for Agents:
 - `verify_package`: Pre-flight check before installing dependencies.
+- `shield_command`: Intercept and block destructive shell actions.
+- `check_cognitive_loop`: Detect and break runaway infinite agent execution loops.
 - `inspect_shadow_diff`: Catch stealthy unprompted additions in code patches.
 - `detect_prompt_injections`: Protect against indirect prompt injection vectors.
 - `audit_manifests`: Validate all project dependencies in bulk.

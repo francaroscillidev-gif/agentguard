@@ -16,17 +16,20 @@ import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { installGitHook } from '../checkers/githook.js';
 import { auditCodeSmells } from '../checkers/smells.js';
 import { detectPromptInjections } from '../checkers/injections.js';
+import { inspectShadowDiff } from '../checkers/shadowdiff.js';
+import { interceptCommandExecution } from '../guardrails/shield.js';
 import { autoFixCodeSmells } from '../fixers/autofix.js';
 import { initConfigFile, loadConfig } from '../config/loader.js';
 import { generateFullMarkdownReport } from '../reporters/markdown.js';
+import { exportSarifReport } from '../reporters/sarif.js';
 import { runServer } from '../mcp/server.js';
 
 const program = new Command();
 
 program
   .name('agentguard')
-  .description('🛡️ AgentGuard: Open Source AI Integrity & Anti-Hallucination Sentinel for Coding Agents')
-  .version('1.5.0');
+  .description('🛡️ AgentGuard: Enterprise-Grade AI Sentinel & Execution Shield for Autonomous Coding Agents')
+  .version('2.0.0');
 
 // Init configuration file
 program
@@ -47,7 +50,7 @@ program
 program
   .command('audit [directory]')
   .description('Run all checks (manifests, secrets, injections, smells, slop) and generate a unified report')
-  .option('--format <format>', 'Output format: human, json, or markdown', 'human')
+  .option('--format <format>', 'Output format: human, json, markdown, or sarif', 'human')
   .action(async (directory = process.cwd(), options) => {
     const config = await loadConfig(directory);
 
@@ -88,6 +91,43 @@ program
       return;
     }
 
+    if (options.format === 'sarif') {
+      const findings: any[] = [];
+      secretsReport.detections.forEach((d) => {
+        findings.push({
+          ruleId: 'AG-SECRET-001',
+          ruleName: 'Hardcoded Secret Exposure',
+          message: `Secret credential detected (${d.patternType}): ${d.snippet}`,
+          filePath: d.filePath,
+          line: d.line,
+          level: 'error'
+        });
+      });
+      injectionsReport.detections.forEach((d) => {
+        findings.push({
+          ruleId: 'AG-INJECT-001',
+          ruleName: 'Indirect Prompt Injection',
+          message: `Prompt injection payload detected: ${d.snippet}`,
+          filePath: d.filePath,
+          line: d.line,
+          level: 'error'
+        });
+      });
+      smellsReport.smells.forEach((s) => {
+        findings.push({
+          ruleId: 'AG-SMELL-001',
+          ruleName: s.type,
+          message: s.details,
+          filePath: s.filePath,
+          line: s.line,
+          level: s.severity === 'high' ? 'error' : 'warning'
+        });
+      });
+      console.log(JSON.stringify(exportSarifReport(findings), null, 2));
+      if (!manifestsReport.passed || !secretsReport.passed || !injectionsReport.passed) process.exitCode = 1;
+      return;
+    }
+
     if (options.format === 'markdown') {
       console.log(generateFullMarkdownReport(auditData));
       if (!manifestsReport.passed || !secretsReport.passed || !injectionsReport.passed) process.exitCode = 1;
@@ -107,6 +147,27 @@ program
       process.exitCode = 1;
     } else {
       console.log(chalk.green.bold('\n✨ ALL AUDIT CHECKS PASSED! Codebase is safe and sound.'));
+    }
+  });
+
+// Shell Guard Command
+program
+  .command('shield-exec <command...>')
+  .description('Safeguard command execution against destructive shell commands (rm -rf /, curl | bash, chmod 777)')
+  .action((cmdParts) => {
+    const raw = cmdParts.join(' ');
+    console.log(chalk.blue(`\n🛡️  Inspecting shell command: "${raw}"`));
+    const res = interceptCommandExecution(raw);
+
+    if (!res.allowed) {
+      console.log(chalk.red.bold(`\n🚨 COMMAND BLOCKED [${res.riskLevel} RISK]!`));
+      console.log(chalk.red(`  Reason: ${res.blockedReason}`));
+      if (res.suggestedAlternative) {
+        console.log(chalk.yellow(`  💡 Alternative: ${res.suggestedAlternative}`));
+      }
+      process.exit(1);
+    } else {
+      console.log(chalk.green.bold('✅ SAFE: Command permitted for execution.'));
     }
   });
 

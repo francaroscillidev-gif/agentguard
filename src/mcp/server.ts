@@ -18,13 +18,17 @@ import { detectHardcodedSecrets } from '../checkers/secrets.js';
 import { auditCodeSmells } from '../checkers/smells.js';
 import { detectPromptInjections } from '../checkers/injections.js';
 import { inspectShadowDiff } from '../checkers/shadowdiff.js';
+import { interceptCommandExecution } from '../guardrails/shield.js';
+import { CognitiveLoopTracker } from '../guardrails/loops.js';
 import { autoFixCodeSmells } from '../fixers/autofix.js';
+
+const loopTracker = new CognitiveLoopTracker(3);
 
 export function createAgentGuardServer() {
   const server = new Server(
     {
       name: 'agentguard-mcp',
-      version: '1.6.0'
+      version: '2.0.0'
     },
     {
       capabilities: {
@@ -58,6 +62,36 @@ export function createAgentGuardServer() {
               }
             },
             required: ['packageName']
+          }
+        },
+        {
+          name: 'shield_command',
+          description:
+            'Pre-execution security interceptor that blocks destructive shell actions (rm -rf /, chmod 777, reverse shells, unverified curl pipes).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              command: {
+                type: 'string',
+                description: 'Shell command the agent is about to execute'
+              }
+            },
+            required: ['command']
+          }
+        },
+        {
+          name: 'check_cognitive_loop',
+          description:
+            'Monitors repeated failing tool executions or identical actions to break runaway infinite agent retry loops.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              action: {
+                type: 'string',
+                description: 'Description or key of the action attempted'
+              }
+            },
+            required: ['action']
           }
         },
         {
@@ -219,6 +253,32 @@ export function createAgentGuardServer() {
           {
             type: 'text',
             text: JSON.stringify(res, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'shield_command') {
+      const cmd = String(args?.command || '');
+      const decision = interceptCommandExecution(cmd);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(decision, null, 2)
+          }
+        ]
+      };
+    }
+
+    if (name === 'check_cognitive_loop') {
+      const act = String(args?.action || '');
+      const verdict = loopTracker.recordAndEvaluate(act);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(verdict, null, 2)
           }
         ]
       };
