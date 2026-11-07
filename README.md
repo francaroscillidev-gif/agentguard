@@ -1,12 +1,21 @@
-# 🛡️ AgentGuard
+<p align="center">
+  <img src="assets/logo.svg" alt="AgentGuard Logo" width="160" height="160" />
+</p>
 
-> **The enterprise-grade AI Sentinel & Execution Shield preventing AI Dependency Hallucinations, Destructive Shell Execution, Cognitive Infinite Loops, Shadow Diff Tampering, Secret Leaks, and Indirect Prompt Injections.**
+<h1 align="center">AgentGuard</h1>
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![npm version](https://img.shields.io/npm/v/@francaroscillidev/agentguard.svg)](https://www.npmjs.com/package/@francaroscillidev/agentguard)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
-[![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0_Ready-blueviolet.svg)](https://sarifweb.azurewebsites.net)
-[![MCP Ready](https://img.shields.io/badge/MCP-Compliant-brightgreen.svg)](https://modelcontextprotocol.io)
+<p align="center">
+  <strong>The Enterprise-Grade AI Sentinel &amp; Execution Shield for Autonomous Coding Agents</strong><br />
+  <em>Prevents AI Dependency Hallucinations, Destructive Shell Execution, Cognitive Loops, Shadow Diffs, Secret Leaks, and Indirect Prompt Injections.</em>
+</p>
+
+<p align="center">
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License" /></a>
+  <a href="https://www.npmjs.com/package/@francaroscillidev/agentguard"><img src="https://img.shields.io/npm/v/@francaroscillidev/agentguard.svg" alt="npm version" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.4-blue.svg" alt="TypeScript" /></a>
+  <a href="https://sarifweb.azurewebsites.net"><img src="https://img.shields.io/badge/SARIF-2.1.0_Ready-blueviolet.svg" alt="SARIF Ready" /></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Compliant-brightgreen.svg" alt="MCP Ready" /></a>
+</p>
 
 ---
 
