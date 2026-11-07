@@ -1,0 +1,45 @@
+name: Bug report
+description: Create a report to help us improve AgentGuard
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug!
+  - type: input
+    id: version
+    attributes:
+      label: AgentGuard Version
+      description: What version of AgentGuard are you running? (e.g. 2.0.0)
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - Package Hallucination Checker (npm/pypi/crates/golang)
+        - Execution Shield (shield-exec)
+        - Cognitive Loop Breaker
+        - Secret Interceptor
+        - Code Smell & Slop Auditor
+        - MCP Server
+        - Git Pre-Commit Hook
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Please describe how to reproduce the issue.
+      placeholder: "1. Run command 'agentguard ...'\n2. Observe output..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
